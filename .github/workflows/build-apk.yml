@@ -1,0 +1,62 @@
+name: Build Android APK
+
+# Runs on every push to main, and can also be triggered manually from the
+# Actions tab (the "workflow_dispatch" line below adds a "Run workflow" button).
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Set up Java (required by Android Gradle build)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.22.0'
+          channel: 'stable'
+
+      - name: Generate Android platform files
+        # Safe to run even if android/ already exists in the repo —
+        # flutter create never overwrites your lib/ or pubspec.yaml.
+        run: flutter create --org com.ledger.financetracker --project-name finance_tracker .
+
+      - name: Merge required AndroidManifest additions
+        # Adds the INTERNET permission needed for Supabase network calls.
+        # (The OAuth deep-link snippet in android/AndroidManifest.additions.xml
+        # is optional — only merge it by hand if you wire up Google Sign-In.)
+        run: |
+          MANIFEST=android/app/src/main/AndroidManifest.xml
+          if ! grep -q "android.permission.INTERNET" "$MANIFEST"; then
+            sed -i 's#<manifest #<manifest xmlns:tools="http://schemas.android.com/tools" #' "$MANIFEST" 2>/dev/null || true
+            sed -i '/<manifest[^>]*>/a\    <uses-permission android:name="android.permission.INTERNET" />' "$MANIFEST"
+          fi
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build release APK
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          flutter build apk --release \
+            --dart-define=SUPABASE_URL=$SUPABASE_URL \
+            --dart-define=SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY
+
+      - name: Upload APK as build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: finance-tracker-release-apk
+          path: build/app/outputs/flutter-apk/app-release.apk

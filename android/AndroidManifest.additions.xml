@@ -1,0 +1,16 @@
+<!--
+  NOT a complete AndroidManifest.xml — `flutter create .` generates the
+  real one (and the CI workflow does this automatically). If building
+  locally, merge these into android/app/src/main/AndroidManifest.xml.
+-->
+
+<!-- 1. Internet permission — direct child of <manifest>, above <application> -->
+<uses-permission android:name="android.permission.INTERNET" />
+
+<!-- 2. OAuth redirect deep link — inside <activity android:name=".MainActivity"> -->
+<intent-filter>
+    <action android:name="android.intent.action.VIEW" />
+    <category android:name="android.intent.category.DEFAULT" />
+    <category android:name="android.intent.category.BROWSABLE" />
+    <data android:scheme="io.supabase.financetracker" android:host="login-callback" />
+</intent-filter>
